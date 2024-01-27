@@ -329,6 +329,9 @@ void* listen_for_whatever(void* arg)
 		}
 		else if (activity == 0)
 		{
+			printf("select timeout for client %d\n", client_index);
+			char timeout_msg[256];
+   			snprintf(timeout_msg, sizeof(timeout_msg), "info:remaining %d seconds;", TIMEOUT);
 			send(clients[client_index].socket_id, timeout_msg, strlen(timeout_msg), 0); // Inform client about the timeout
 			printf("select timeout\n");
 			printf("THREAD EXIT %s-----------\n", clients[client_index].name);
@@ -595,7 +598,7 @@ void* game_session(void* arg) {
 		}
 		end_game(opponent_index, 0);
 	}
-// tu mo no potrebujem deallokova  dajak  pam 
+// tu mo�no potrebujem deallokova� dajak� pam�
 	list_players();
 	return NULL;
 }
@@ -660,9 +663,14 @@ int find_client_to_reconnect(char* name)
 
 // Updated function to add a client to the server
 int add_client(int socket_id) {
+
     printf("add_client\n");
 
+
+
     pthread_mutex_lock(&clients_mutex);
+
+
 
     // Initialize new player structure
     player new_player;
@@ -671,8 +679,9 @@ int add_client(int socket_id) {
     new_player.in_game = 0; // Initially not in a game
     new_player.is_winner = -1;
 
-	// Read client's name from socket
-    ssize_t bytes_received = recv(socket_id, new_player.name, MAX_NAME_LEN - 1, 0);
+    // Read client's name from socket
+    char buffer[MAX_NAME_LEN + 1];  // Temporary buffer to check name length
+    ssize_t bytes_received = recv(socket_id, buffer, MAX_NAME_LEN, 0);  // Read up to MAX_NAME_LEN to check for longer names
     if (bytes_received <= 0) {
         // Handle error or disconnection
         printf("Error in receiving client name or client disconnected.\n");
@@ -680,25 +689,37 @@ int add_client(int socket_id) {
         pthread_mutex_unlock(&clients_mutex);
         return -1;
     }
+	buffer[bytes_received] = '\0';
+    // Check if the name is too long
+    if (bytes_received == MAX_NAME_LEN) {
 
-    new_player.name[bytes_received] = '\0';
+        char too_long_msg[] = "error:Name too long. Disconnecting;";
+        send(socket_id, too_long_msg, strlen(too_long_msg), 0);
+        shutdown(socket_id, SHUT_RDWR);
+        close(socket_id);
+        pthread_mutex_unlock(&clients_mutex);
+        return -1;
+    }
+
+    // Name is acceptable, copy it to the new_player structure
+    strncpy(new_player.name, buffer, MAX_NAME_LEN);
     char* newline = strchr(new_player.name, '\n');
     if (newline) *newline = '\0';  // Ensure null termination
 
 	// Check if the name starts with "name:"
 	if (strncmp(new_player.name, "name:", 5) == 0) {
 		memmove(new_player.name, new_player.name + 5, strlen(new_player.name) - 4);
+
 	} else {
+
 		char problem_msg[] = "info:Opponent issues;";
 		send(clients[socket_id].socket_id, problem_msg, strlen(problem_msg), 0);
 		usleep(100000);
 		shutdown(socket_id, SHUT_RDWR);
 		close(socket_id); // Close the connection
 		pthread_mutex_unlock(&clients_mutex);
-
 		return -1; // Return an error code
 	}
-
     printf("Received client name: %s\n", new_player.name);
 
     // Check for existing client with the same name
@@ -726,22 +747,17 @@ int add_client(int socket_id) {
         }
     }
 
-
 	//send(socket_id, "Make your move rokc/paper/scissors.\n", strlen("Hello, welcome to the game. Please tell us your name.\n"), 0);
-
 	//usleep(100000);
     int free_spot = find_free_spot();
-	
     if (free_spot == -1) {
         printf("Maximum number of clients reached. Cannot add more.\n");
         char busy_message[] = "error:ConnectionError: Server is busy. Try later;";
-		
 		send(socket_id, busy_message, strlen(busy_message), 0);
         close(socket_id);
         pthread_mutex_unlock(&clients_mutex);
         return -1;
     }
-
 
  	char success_msg[] = "success: logged in;";
     send(socket_id, success_msg, strlen(success_msg), 0);
@@ -751,7 +767,9 @@ int add_client(int socket_id) {
     printf("Client [%d] is %s", free_spot, new_player.name);
     pthread_mutex_unlock(&clients_mutex);
     return free_spot;
+
 }
+
 
 
 void* listen_for_clients(void* arg)
