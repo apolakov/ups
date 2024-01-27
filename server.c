@@ -329,9 +329,6 @@ void* listen_for_whatever(void* arg)
 		}
 		else if (activity == 0)
 		{
-			printf("select timeout for client %d\n", client_index);
-			char timeout_msg[256];
-   			snprintf(timeout_msg, sizeof(timeout_msg), "info:remaining %d seconds;", TIMEOUT);
 			send(clients[client_index].socket_id, timeout_msg, strlen(timeout_msg), 0); // Inform client about the timeout
 			printf("select timeout\n");
 			printf("THREAD EXIT %s-----------\n", clients[client_index].name);
@@ -598,7 +595,7 @@ void* game_session(void* arg) {
 		}
 		end_game(opponent_index, 0);
 	}
-// tu mo�no potrebujem deallokova� dajak� pam�
+// tu mo no potrebujem deallokova  dajak  pam 
 	list_players();
 	return NULL;
 }
@@ -755,7 +752,6 @@ int add_client(int socket_id) {
     pthread_mutex_unlock(&clients_mutex);
     return free_spot;
 }
-
 
 
 void* listen_for_clients(void* arg)

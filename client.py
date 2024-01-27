@@ -317,9 +317,10 @@ class RPSClient:
                     name_message = item['name']
                     if name_message.startswith("cut"):
                         cut_name = name_message.split(" ", 1)[1]  # Get the cut name after the "cut " keyword
+                        self.player_name = cut_name  # Update the player's name with the cut version
+                        self.general_label.config(text=f"Hello {cut_name}")
                         self.connection_label.config(text=f"Your name is too long. It was cut to {cut_name}")
-                        self.connection_label.update()
-                        
+                        self.connection_label.update()       
 
 
 
